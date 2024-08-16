@@ -567,10 +567,10 @@ class Rag:
     Creates a context loader for chromadb
     """
     def __init__(self, collection):
-        self.host = 'localhost'
-        self.port = 8000
+        self.host = os.environ.get('CHROMADB_HOST','localhost')
+        self.port = int(os.environ.get('CHROMADB_PORT','8000'))
         self.collection = collection
-        self.resultsCount = 10
+        self.resultsCount = int(os.environ.get('CHROMADB_RESPONSE_COUNT','5'))
         self.check_chromadb()
         pass
 

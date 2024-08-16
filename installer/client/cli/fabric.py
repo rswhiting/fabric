@@ -189,8 +189,7 @@ def main():
         with open(config_context, "r") as f:
             context = f.read()
     if args.rag:
-        context = context + "\n\n" + Rag(args.rag).get_context(text)
-        print(context)
+        context = f'{context}\n\n{Rag(args.rag).get_context(text)}'
 
     if args.remoteOllamaServer:
         standaloneSend(text, context=context, host=args.remoteOllamaServer)
