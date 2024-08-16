@@ -4,6 +4,7 @@ from openai import OpenAI, APIConnectionError
 import asyncio
 import pyperclip
 import sys
+import httpx
 import platform
 from dotenv import load_dotenv
 import zipfile
@@ -11,6 +12,7 @@ import tempfile
 import subprocess
 import shutil
 from youtube_transcript_api import YouTubeTranscriptApi
+import chromadb
 
 current_directory = os.path.dirname(os.path.realpath(__file__))
 config_directory = os.path.expanduser("~/.config/fabric")
@@ -558,6 +560,45 @@ class Alias:
         with open(os.path.join(self.home_directory, ".config/fabric/fabric-bootstrap.inc"), "w") as w:
             for pattern in self.patterns:
                 w.write(f"alias {pattern}='fabric --pattern {pattern}'\n")
+
+
+class Rag:
+    """
+    Creates a context loader for chromadb
+    """
+    def __init__(self, collection):
+        self.host = 'localhost'
+        self.port = 8000
+        self.collection = collection
+        self.resultsCount = 10
+        self.check_chromadb()
+        pass
+
+    def check_chromadb(self):
+        try:
+            # Check if ChromaDB is running
+            response = httpx.get(f"http://{self.host}:{self.port}/docs")
+            if response.status_code == 200:
+                # print(f"Found ChromaDB on http://{self.host}:{self.port}")
+                pass
+            self.client = chromadb.HttpClient(host=self.host, port=self.port)
+            # Check if the collection exists
+            try:
+                self.client.get_collection(self.collection)
+            except:
+                print(f"ChromaDb can't find your collection: {self.collection}")
+                sys.exit(1)
+        except httpx.RequestError:
+            print("ChromaDB is not running. Launch chromadb with `chroma run`")
+            sys.exit(1)
+
+    def get_context(self, text):
+        collection = self.client.get_collection(self.collection)
+        # Typically I would pull this apart and report out the file results, but I don't think that's 
+        # necessary here unless we have a logging system with more debug levels
+        documents = collection.query(query_texts=text, n_results=self.resultsCount)["documents"][0]
+        context = "\n\n".join(documents)
+        return context
 
 
 class Setup:

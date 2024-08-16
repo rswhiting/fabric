@@ -1,4 +1,4 @@
-from .utils import Standalone, Update, Setup, Alias, run_electron_app
+from .utils import Standalone, Update, Setup, Alias, Rag, run_electron_app
 import argparse
 import sys
 import os
@@ -73,6 +73,8 @@ def main():
                         help='The URL of the remote ollamaserver to use. ONLY USE THIS if you are using a local ollama server in an non-default location or port')
     parser.add_argument('--context', '-c',
                         help="Use Context file (context.md) to add context to your pattern", action="store_true")
+    parser.add_argument('--rag', '-r',
+                        help='Select a chromadb collection to query as context for your pattern')
 
     args = parser.parse_args()
     home_holder = os.path.expanduser("~")
@@ -107,6 +109,8 @@ def main():
         if not os.path.exists(os.path.join(config, "context.md")):
             print("Please create a context.md file in ~/.config/fabric")
             sys.exit()
+    if args.rag:
+        Rag(args.rag)
     if args.agents:
         standalone = Standalone(args)
         text = ""  # Initialize text variable
@@ -176,36 +180,24 @@ def main():
         text = args.text
     else:
         text = standalone.get_cli_input()
-    if args.stream and not args.context:
-        if args.remoteOllamaServer:
-            standalone.streamMessage(text, host=args.remoteOllamaServer)
-        else:
-            standalone.streamMessage(text)
-        sys.exit()
-    if args.stream and args.context:
+
+    # Instead of having all permutations of send and strea, let's simplify it a bit
+    standaloneSend = standalone.streamMessage if args.stream else standalone.sendMessage
+
+    context = None
+    if args.context:
         with open(config_context, "r") as f:
             context = f.read()
-            if args.remoteOllamaServer:
-                standalone.streamMessage(
-                    text, context=context, host=args.remoteOllamaServer)
-            else:
-                standalone.streamMessage(text, context=context)
-        sys.exit()
-    elif args.context:
-        with open(config_context, "r") as f:
-            context = f.read()
-            if args.remoteOllamaServer:
-                standalone.sendMessage(
-                    text, context=context, host=args.remoteOllamaServer)
-            else:
-                standalone.sendMessage(text, context=context)
-        sys.exit()
+    if args.rag:
+        context = context + "\n\n" + Rag(args.rag).get_context(text)
+        print(context)
+
+    if args.remoteOllamaServer:
+        standaloneSend(text, context=context, host=args.remoteOllamaServer)
     else:
-        if args.remoteOllamaServer:
-            standalone.sendMessage(text, host=args.remoteOllamaServer)
-        else:
-            standalone.sendMessage(text)
-        sys.exit()
+        standaloneSend(text, context=context)
+
+    sys.exit()
 
 
 if __name__ == "__main__":
